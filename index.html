@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendario de Reservas</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
+.app { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e0ddd5; }
+.header h1 { font-size: 20px; font-weight: 600; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #888; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #639922; }
+.dot.error { background: #E24B4A; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media(max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+.card { background: #fff; border: 1px solid #e8e5dd; border-radius: 12px; padding: 1.25rem; }
+.card-title { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
+.form-group { margin-bottom: 12px; }
+label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+input[type=text], input[type=date], textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid #ddd; border-radius: 8px;
+  font-size: 14px; font-family: inherit; background: #fff; color: #1a1a1a;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus { outline: none; border-color: #888; }
+textarea { resize: vertical; min-height: 60px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; border: none; transition: opacity 0.15s; }
+.btn-primary { background: #1a1a1a; color: #fff; width: 100%; margin-top: 4px; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-nav button { background: none; border: 1px solid #e0ddd5; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; color: #1a1a1a; }
+.cal-nav button:hover { background: #f5f5f0; }
+.cal-month { font-size: 15px; font-weight: 600; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day-hdr { font-size: 11px; color: #aaa; text-align: center; padding: 4px 0; font-weight: 600; }
+.cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 6px; color: #1a1a1a; }
+.cal-day.other { color: #ccc; }
+.cal-day.today { font-weight: 700; border: 1.5px solid #1a1a1a; }
+.cal-day.booked { background: #EAF3DE; color: #3B6D11; font-weight: 500; }
+.cal-day.checkin { background: #1D9E75; color: #fff; border-radius: 8px 2px 2px 8px; }
+.cal-day.checkout { background: #9FE1CB; color: #085041; border-radius: 2px 8px 8px 2px; }
+.list-area { margin-top: 1.5rem; }
+.booking { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0ede5; }
+.booking:last-child { border-bottom: none; }
+.booking-name { font-size: 14px; font-weight: 600; }
+.booking-dates { font-size: 13px; color: #666; margin-top: 2px; }
+.booking-notes { font-size: 12px; color: #aaa; margin-top: 2px; }
+.nights { font-size: 12px; background: #f5f5f0; padding: 2px 8px; border-radius: 6px; color: #666; margin-right: 8px; white-space: nowrap; }
+.btn-del { background: none; border: none; cursor: pointer; color: #ccc; font-size: 18px; padding: 0 4px; border-radius: 4px; line-height: 1; }
+.btn-del:hover { background: #fee; color: #c00; }
+.empty { font-size: 13px; color: #bbb; text-align: center; padding: 1.5rem 0; }
+.sync { font-size: 12px; color: #bbb; text-align: right; margin-top: 8px; }
+.toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #1a1a1a; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 100; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Calendario de Reservas</h1>
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="status-txt">Cargando...</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="card-title">Nueva reserva</div>
+        <div class="form-group">
+          <label>Huésped</label>
+          <input type="text" id="guest" placeholder="Nombre del huésped" />
+        </div>
+        <div class="form-group">
+          <div class="form-row">
+            <div><label>Entrada</label><input type="date" id="checkin" /></div>
+            <div><label>Salida</label><input type="date" id="checkout" /></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notas (opcional)</label>
+          <textarea id="notes" placeholder="Notas adicionales..."></textarea>
+        </div>
+        <button class="btn btn-primary" id="btn-add" onclick="addBooking()">Añadir reserva</button>
+      </div>
+
+      <div class="list-area">
+        <div class="card">
+          <div class="card-title">Próximas reservas</div>
+          <div id="list"><div class="empty">Sin reservas</div></div>
+          <div class="sync" id="sync"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cal-nav">
+        <button onclick="prevMonth()">&#8249;</button>
+        <span class="cal-month" id="cal-month"></span>
+        <button onclick="nextMonth()">&#8250;</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-hdr">Lu</div><div class="cal-day-hdr">Ma</div>
+        <div class="cal-day-hdr">Mi</div><div class="cal-day-hdr">Ju</div>
+        <div class="cal-day-hdr">Vi</div><div class="cal-day-hdr">Sá</div>
+        <div class="cal-day-hdr">Do</div>
+        <div id="cal-days"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let bookings = [];
+let calYear, calMonth;
+const now = new Date();
+calYear = now.getFullYear();
+calMonth = now.getMonth();
+const API = '';
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function setStatus(ok) {
+  document.getElementById('dot').className = 'dot' + (ok ? '' : ' error');
+  document.getElementById('status-txt').textContent = ok ? 'Sincronizado' : 'Error de conexión';
+}
+
+async function load() {
+  try {
+    const res = await fetch(API + '/reservas');
+    bookings = await res.json();
+    setStatus(true);
+    render();
+    document.getElementById('sync').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  } catch(e) {
+    setStatus(false);
+  }
+}
+
+async function addBooking() {
+  const guest = document.getElementById('guest').value.trim();
+  const checkin = document.getElementById('checkin').value;
+  const checkout = document.getElementById('checkout').value;
+  const notas = document.getElementById('notes').value.trim();
+  if (!guest || !checkin || !checkout) { toast('Completa huésped y fechas'); return; }
+  if (checkin >= checkout) { toast('La salida debe ser posterior a la entrada'); return; }
+  const btn = document.getElementById('btn-add');
+  btn.disabled = true;
+  try {
+    const res = await fetch(API + '/reservas', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({huesped: guest, checkin, checkout, notas})
+    });
+    if (!res.ok) { const e = await res.json(); toast(e.error || 'Error'); return; }
+    document.getElementById('guest').value = '';
+    document.getElementById('checkin').value = '';
+    document.getElementById('checkout').value = '';
+    document.getElementById('notes').value = '';
+    toast('Reserva añadida');
+    await load();
+  } catch(e) { toast('Error de conexión'); }
+  finally { btn.disabled = false; }
+}
+
+async function del(id) {
+  if (!confirm('¿Eliminar esta reserva?')) return;
+  try {
+    await fetch(API + '/reservas/' + id, {method: 'DELETE'});
+    toast('Reserva eliminada');
+    await load();
+  } catch(e) { toast('Error de conexión'); }
+}
+
+function fmt(d) { const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; }
+function nights(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+
+function renderList() {
+  const el = document.getElementById('list');
+  const today = new Date().toISOString().split('T')[0];
+  const up = bookings.filter(b => b.checkout >= today);
+  if (!up.length) { el.innerHTML = '<div class="empty">No hay reservas próximas</div>'; return; }
+  el.innerHTML = up.map(b => `
+    <div class="booking">
+      <div>
+        <div class="booking-name">${b.huesped}</div>
+        <div class="booking-dates">${fmt(b.checkin)} → ${fmt(b.checkout)}</div>
+        ${b.notas ? `<div class="booking-notes">${b.notas}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;flex-shrink:0">
+        <span class="nights">${nights(b.checkin, b.checkout)}n</span>
+        <button class="btn-del" onclick="del(${b.id})">×</button>
+      </div>
+    </div>`).join('');
+}
+
+function isBooked(d) { return bookings.some(b => d >= b.checkin && d < b.checkout); }
+function isCheckin(d) { return bookings.some(b => b.checkin === d); }
+function isCheckout(d) { return bookings.some(b => b.checkout === d); }
+
+function renderCal() {
+  const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('cal-month').textContent = `${months[calMonth]} ${calYear}`;
+  const first = new Date(calYear, calMonth, 1);
+  let startDay = first.getDay(); startDay = startDay === 0 ? 6 : startDay - 1;
+  const dim = new Date(calYear, calMonth + 1, 0).getDate();
+  const prev = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date().toISOString().split('T')[0];
+  let html = '';
+  for (let i = startDay - 1; i >= 0; i--) html += `<div class="cal-day other">${prev - i}</div>`;
+  for (let d = 1; d <= dim; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls = 'cal-day';
+    if (ds === today) cls += ' today';
+    if (isCheckin(ds)) cls += ' booked checkin';
+    else if (isCheckout(ds)) cls += ' booked checkout';
+    else if (isBooked(ds)) cls += ' booked';
+    html += `<div class="${cls}">${d}</div>`;
+  }
+  const total = startDay + dim;
+  const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= rem; d++) html += `<div class="cal-day other">${d}</div>`;
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function render() { renderList(); renderCal(); }
+function prevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCal(); }
+function nextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCal(); }
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
