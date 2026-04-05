@@ -133,7 +133,7 @@ let calYear, calMonth;
 const now = new Date();
 calYear = now.getFullYear();
 calMonth = now.getMonth();
-const API = '';
+const API = 'https://web-production-cde17.up.railway.app';
 
 const COLORS = [
   { start: '#2563eb', startTxt: '#fff', mid: '#dbeafe', midTxt: '#1d4ed8' },
@@ -231,9 +231,9 @@ function renderCal() {
   const cells = [];
   for (let i = startDow - 1; i >= 0; i--) {
     const d = prevDim - i;
-    const m = calMonth === 0 ? 12 : calMonth;
-    const y = calMonth === 0 ? calYear - 1 : calYear;
-    cells.push({ date: `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, other: true, day: d });
+    const prevMonth = calMonth === 0 ? 12 : calMonth;
+    const prevYear = calMonth === 0 ? calYear - 1 : calYear;
+    cells.push({ date: `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`, other: true, day: d });
   }
   for (let d = 1; d <= dim; d++)
     cells.push({ date: `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, other: false, day: d });
